@@ -68,11 +68,9 @@ export class QueryObserver<
     TQueryKey
   >
   private previousQueryResult?: QueryObserverResult<TData, TError>
-  private previousSelectError: Error | null
-  private previousSelect?: {
-    fn: (data: TQueryData) => TData
-    result: TData
-  }
+  private selectError: Error | null
+  private selectFn?: (data: TQueryData) => TData
+  private selectResult?: TData
   private staleTimeoutId?: number
   private refetchIntervalId?: number
   private currentRefetchInterval?: number | false
@@ -93,7 +91,7 @@ export class QueryObserver<
     this.client = client
     this.options = options
     this.trackedProps = []
-    this.previousSelectError = null
+    this.selectError = null
     this.bindMethods()
     this.setOptions(options)
   }
@@ -122,11 +120,19 @@ export class QueryObserver<
   }
 
   shouldFetchOnReconnect(): boolean {
-    return shouldFetchOnReconnect(this.currentQuery, this.options)
+    return shouldFetchOn(
+      this.currentQuery,
+      this.options,
+      this.options.refetchOnReconnect
+    )
   }
 
   shouldFetchOnWindowFocus(): boolean {
-    return shouldFetchOnWindowFocus(this.currentQuery, this.options)
+    return shouldFetchOn(
+      this.currentQuery,
+      this.options,
+      this.options.refetchOnWindowFocus
+    )
   }
 
   destroy(): void {
@@ -500,27 +506,21 @@ export class QueryObserver<
       if (
         prevResult &&
         state.data === prevResultState?.data &&
-        options.select === this.previousSelect?.fn &&
-        !this.previousSelectError
+        options.select === this.selectFn
       ) {
-        data = this.previousSelect.result
+        data = this.selectResult
       } else {
         try {
+          this.selectFn = options.select
           data = options.select(state.data)
           if (options.structuralSharing !== false) {
             data = replaceEqualDeep(prevResult?.data, data)
           }
-          this.previousSelect = {
-            fn: options.select,
-            result: data,
-          }
-          this.previousSelectError = null
+          this.selectResult = data
+          this.selectError = null
         } catch (selectError) {
           getLogger().error(selectError)
-          error = selectError
-          this.previousSelectError = selectError
-          errorUpdatedAt = Date.now()
-          status = 'error'
+          this.selectError = selectError
         }
       }
     }
@@ -557,13 +557,10 @@ export class QueryObserver<
                 placeholderData
               )
             }
-            this.previousSelectError = null
+            this.selectError = null
           } catch (selectError) {
             getLogger().error(selectError)
-            error = selectError
-            this.previousSelectError = selectError
-            errorUpdatedAt = Date.now()
-            status = 'error'
+            this.selectError = selectError
           }
         }
       }
@@ -573,6 +570,13 @@ export class QueryObserver<
         data = placeholderData as TData
         isPlaceholderData = true
       }
+    }
+
+    if (this.selectError) {
+      error = this.selectError as any
+      data = this.selectResult
+      errorUpdatedAt = Date.now()
+      status = 'error'
     }
 
     const result: QueryObserverBaseResult<TData, TError> = {
@@ -586,6 +590,7 @@ export class QueryObserver<
       error,
       errorUpdatedAt,
       failureCount: state.fetchFailureCount,
+      errorUpdateCount: state.errorUpdateCount,
       isFetched: state.dataUpdateCount > 0 || state.errorUpdateCount > 0,
       isFetchedAfterMount:
         state.dataUpdateCount > queryInitialState.dataUpdateCount ||
@@ -746,47 +751,30 @@ function shouldLoadOnMount(
   )
 }
 
-function shouldRefetchOnMount(
-  query: Query<any, any, any, any>,
-  options: QueryObserverOptions<any, any, any, any>
-): boolean {
-  return (
-    options.enabled !== false &&
-    query.state.dataUpdatedAt > 0 &&
-    (options.refetchOnMount === 'always' ||
-      (options.refetchOnMount !== false && isStale(query, options)))
-  )
-}
-
 function shouldFetchOnMount(
   query: Query<any, any, any, any>,
   options: QueryObserverOptions<any, any, any, any, any>
 ): boolean {
   return (
-    shouldLoadOnMount(query, options) || shouldRefetchOnMount(query, options)
+    shouldLoadOnMount(query, options) ||
+    (query.state.dataUpdatedAt > 0 &&
+      shouldFetchOn(query, options, options.refetchOnMount))
   )
 }
 
-function shouldFetchOnReconnect(
+function shouldFetchOn(
   query: Query<any, any, any, any>,
-  options: QueryObserverOptions<any, any, any, any, any>
-): boolean {
-  return (
-    options.enabled !== false &&
-    (options.refetchOnReconnect === 'always' ||
-      (options.refetchOnReconnect !== false && isStale(query, options)))
-  )
-}
+  options: QueryObserverOptions<any, any, any, any, any>,
+  field: typeof options['refetchOnMount'] &
+    typeof options['refetchOnWindowFocus'] &
+    typeof options['refetchOnReconnect']
+) {
+  if (options.enabled !== false) {
+    const value = typeof field === 'function' ? field(query) : field
 
-function shouldFetchOnWindowFocus(
-  query: Query<any, any, any, any>,
-  options: QueryObserverOptions<any, any, any, any, any>
-): boolean {
-  return (
-    options.enabled !== false &&
-    (options.refetchOnWindowFocus === 'always' ||
-      (options.refetchOnWindowFocus !== false && isStale(query, options)))
-  )
+    return value === 'always' || (value !== false && isStale(query, options))
+  }
+  return false
 }
 
 function shouldFetchOptionally(

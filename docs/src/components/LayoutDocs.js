@@ -20,6 +20,7 @@ import { Seo } from './Seo'
 import MDXComponents from './MDXComponents'
 import Head from 'next/head'
 import { getManifest } from 'manifests/getManifest'
+import BytesForm from './BytesForm'
 
 const getSlugAndTag = path => {
   const parts = path.split('/')
@@ -111,6 +112,36 @@ export const LayoutDocs = props => {
                         On this page
                       </h4>
                       <Toc title={props.meta.title} />
+                      <div className="mt-12">
+                        <h4 className="font-semibold uppercase text-sm mb-2 mt-2 text-gray-500">
+                          Want to skip the docs?
+                        </h4>
+                        <p className='text-sm'>
+                          Fast track your learning and {' '}
+                          <a
+                            href="https://ui.dev/react-query?from=tanstack"
+                            className="text-blue-600 font-semibold transition-colors duration-150 ease-out"
+                          >
+                            take the offical course ↗️
+                          </a>
+                        </p>
+                      </div>
+                      <div className="mt-12 relative">
+                        <h4 className="font-semibold uppercase text-sm mb-2 mt-2 text-gray-500">
+                          Subscribe to{' '}
+                          <a
+                            className="text-blue-600"
+                            href="https://bytes.dev?r=tanstack"
+                          >
+                            Bytes
+                          </a>
+                        </h4>
+                        <p className="mt-4  text-sm leading-6 mb-4">
+                          Your weekly dose of JavaScript news. Delivered every
+                          Monday to over 80,000 devs, for free.
+                        </p>
+                        <BytesForm />
+                      </div>
                     </div>
                   </div>
                 )}

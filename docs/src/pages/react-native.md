@@ -28,11 +28,9 @@ onlineManager.setEventListener(setOnline => {
 ## Refetch on App focus
 
 In React Native you have to use React Query `focusManager` to refetch when the App is focused.
-You can use 'react-native-appstate-hook' to be notified when the App state has changed.
 
 ```ts
 import { focusManager } from 'react-query'
-import useAppState from 'react-native-appstate-hook'
 
 function onAppStateChange(status: AppStateStatus) {
   if (Platform.OS !== 'web') {
@@ -40,9 +38,11 @@ function onAppStateChange(status: AppStateStatus) {
   }
 }
 
-useAppState({
-  onChange: onAppStateChange,
-})
+useEffect(() => {
+  const subscription = AppState.addEventListener('change', onAppStateChange)
+
+  return () => subscription.remove()
+}, [])
 ```
 
 ## Refresh on Screen focus
@@ -55,16 +55,19 @@ import React from 'react'
 import { useFocusEffect } from '@react-navigation/native'
 
 export function useRefreshOnFocus<T>(refetch: () => Promise<T>) {
-  const enabledRef = React.useRef(false)
+  const firstTimeRef = React.useRef(true)
 
   useFocusEffect(
     React.useCallback(() => {
-      if (enabledRef.current) {
-        refetch()
-      } else {
-        enabledRef.current = true
+      if (firstTimeRef.current) {
+         firstTimeRef.current = false;
+         return;
       }
+
+      refetch()
     }, [refetch])
   )
 }
 ```
+
+In the above code, `refetch` is skipped the first time because `useFocusEffect` calls our callback on mount in addition to screen focus.

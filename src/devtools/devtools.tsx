@@ -58,6 +58,10 @@ interface DevtoolsOptions {
    * Defaults to 'aside'.
    */
   containerElement?: string | any
+  /**
+   * nonce for style element for CSP
+   */
+  styleNonce?: string
 }
 
 interface DevtoolsPanelOptions {
@@ -73,6 +77,10 @@ interface DevtoolsPanelOptions {
    * A boolean variable indicating whether the panel is open or closed
    */
   isOpen?: boolean
+  /**
+   * nonce for style element for CSP
+   */
+  styleNonce?: string
   /**
    * A function that toggles the open and close state of the panel
    */
@@ -92,6 +100,7 @@ export function ReactQueryDevtools({
   toggleButtonProps = {},
   position = 'bottom-left',
   containerElement: Container = 'aside',
+  styleNonce,
 }: DevtoolsOptions): React.ReactElement | null {
   const rootRef = React.useRef<HTMLDivElement>(null)
   const panelRef = React.useRef<HTMLDivElement>(null)
@@ -229,6 +238,7 @@ export function ReactQueryDevtools({
       <ThemeProvider theme={theme}>
         <ReactQueryDevtoolsPanel
           ref={panelRef as any}
+          styleNonce={styleNonce}
           {...otherPanelProps}
           style={{
             position: 'fixed',
@@ -268,7 +278,6 @@ export function ReactQueryDevtools({
         {isResolvedOpen ? (
           <Button
             type="button"
-            aria-label="Close React Query Devtools"
             aria-controls="ReactQueryDevtoolsPanel"
             aria-haspopup="true"
             aria-expanded="true"
@@ -375,7 +384,13 @@ export const ReactQueryDevtoolsPanel = React.forwardRef<
   HTMLDivElement,
   DevtoolsPanelOptions
 >(function ReactQueryDevtoolsPanel(props, ref): React.ReactElement {
-  const { isOpen = true, setIsOpen, handleDragStart, ...panelProps } = props
+  const {
+    isOpen = true,
+    styleNonce,
+    setIsOpen,
+    handleDragStart,
+    ...panelProps
+  } = props
 
   const queryClient = useQueryClient()
   const queryCache = queryClient.getQueryCache()
@@ -467,6 +482,7 @@ export const ReactQueryDevtoolsPanel = React.forwardRef<
         {...panelProps}
       >
         <style
+          nonce={styleNonce}
           dangerouslySetInnerHTML={{
             __html: `
             .ReactQueryDevtoolsPanel * {
@@ -523,12 +539,24 @@ export const ReactQueryDevtoolsPanel = React.forwardRef<
               alignItems: 'center',
             }}
           >
-            <Logo
-              aria-hidden
+            <button
+              type="button"
+              aria-label="Close React Query Devtools"
+              aria-controls="ReactQueryDevtoolsPanel"
+              aria-haspopup="true"
+              aria-expanded="true"
+              onClick={() => setIsOpen(false)}
               style={{
+                display: 'inline-flex',
+                background: 'none',
+                border: 0,
+                padding: 0,
                 marginRight: '.5em',
+                cursor: 'pointer',
               }}
-            />
+            >
+              <Logo aria-hidden />
+            </button>
             <div
               style={{
                 display: 'flex',
@@ -588,6 +616,7 @@ export const ReactQueryDevtoolsPanel = React.forwardRef<
                   style={{
                     flex: '1',
                     marginRight: '.5em',
+                    width: '100%',
                   }}
                 />
                 {!filter ? (
@@ -723,7 +752,7 @@ export const ReactQueryDevtoolsPanel = React.forwardRef<
                 style={{
                   marginBottom: '.5em',
                   display: 'flex',
-                  alignItems: 'stretch',
+                  alignItems: 'start',
                   justifyContent: 'space-between',
                 }}
               >
